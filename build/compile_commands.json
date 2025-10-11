@@ -1,0 +1,152 @@
+[
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o CMakeFiles/mr2_arm_fw.dir/Core/Src/main.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Core/Src/main.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Core/Src/main.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/CMakeFiles/mr2_arm_fw.dir/Core/Src/main.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o CMakeFiles/mr2_arm_fw.dir/Core/Src/stm32g4xx_it.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Core/Src/stm32g4xx_it.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Core/Src/stm32g4xx_it.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/CMakeFiles/mr2_arm_fw.dir/Core/Src/stm32g4xx_it.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o CMakeFiles/mr2_arm_fw.dir/Core/Src/stm32g4xx_hal_msp.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Core/Src/stm32g4xx_hal_msp.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Core/Src/stm32g4xx_hal_msp.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/CMakeFiles/mr2_arm_fw.dir/Core/Src/stm32g4xx_hal_msp.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o CMakeFiles/mr2_arm_fw.dir/Core/Src/sysmem.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Core/Src/sysmem.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Core/Src/sysmem.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/CMakeFiles/mr2_arm_fw.dir/Core/Src/sysmem.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o CMakeFiles/mr2_arm_fw.dir/Core/Src/syscalls.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Core/Src/syscalls.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Core/Src/syscalls.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/CMakeFiles/mr2_arm_fw.dir/Core/Src/syscalls.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -x assembler-with-cpp -MMD -MP -g -o CMakeFiles/mr2_arm_fw.dir/startup_stm32g431xx.s.obj -c /Users/gmmyung/Developer/mr2_arm_fw/startup_stm32g431xx.s",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/startup_stm32g431xx.s",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/CMakeFiles/mr2_arm_fw.dir/startup_stm32g431xx.s.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Core/Src/system_stm32g4xx.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Core/Src/system_stm32g4xx.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Core/Src/system_stm32g4xx.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Core/Src/system_stm32g4xx.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_fdcan.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_fdcan.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_fdcan.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_fdcan.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_rcc_ex.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ex.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ramfunc.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ramfunc.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ramfunc.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_flash_ramfunc.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_gpio.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_exti.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_exti.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_exti.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_exti.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma_ex.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma_ex.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma_ex.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_dma_ex.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_pwr_ex.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_cortex.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c_ex.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c_ex.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c_ex.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_i2c_ex.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart.c.obj"
+},
+{
+  "directory": "/Users/gmmyung/Developer/mr2_arm_fw/build",
+  "command": "/opt/homebrew/bin/arm-none-eabi-gcc -DDEBUG -DSTM32G431xx -DUSE_HAL_DRIVER -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Core/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Device/ST/STM32G4xx/Include -I/Users/gmmyung/Developer/mr2_arm_fw/cmake/stm32cubemx/../../Drivers/CMSIS/Include  -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard  -Wall -fdata-sections -ffunction-sections -O0 -g3 -std=gnu11 -o cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart_ex.c.obj -c /Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart_ex.c",
+  "file": "/Users/gmmyung/Developer/mr2_arm_fw/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart_ex.c",
+  "output": "/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/CMakeFiles/STM32_Drivers.dir/__/__/Drivers/STM32G4xx_HAL_Driver/Src/stm32g4xx_hal_uart_ex.c.obj"
+}
+]
