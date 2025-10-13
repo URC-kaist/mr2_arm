@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/Users/gmmyung/Developer/mr2_arm_fw/build/cmake_install.cmake",
-		"/Users/gmmyung/Developer/mr2_arm_fw/build/cmake/stm32cubemx/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
