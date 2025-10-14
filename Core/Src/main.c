@@ -27,6 +27,12 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef struct {
+  I2C_HandleTypeDef *handle;
+  const char *name;
+  uint32_t consecutive_failures;
+  uint32_t digital_filter;
+} I2C_FaultContext;
 
 /* USER CODE END PTD */
 
@@ -43,6 +49,7 @@
 #define ENC_FLAG_SENSOR_FAULT 0x04u
 #define ENC_FLAG_OVER_SPEED 0x08u
 #define CAN_ERROR_FLAG_BUS_OFF (1UL << 9)
+#define I2C_FAULT_RECOVERY_THRESHOLD 2u
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -58,6 +65,7 @@ I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c2;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
 
@@ -66,9 +74,15 @@ static volatile uint32_t angle_check_pending = 0UL;
 static FDCAN_TxHeaderTypeDef encoder_status_headers[2];
 static FDCAN_TxHeaderTypeDef limit_switch_header;
 static uint8_t encoder_status_flags[2] = {0u, 0u};
-static volatile uint16_t limit_switch_event_counter = 0u;
 static volatile uint8_t limit_switch_pending = 0u;
 static uint8_t limit_switch_frame[8] = {0};
+static uint8_t limit_switch_last_state = 0u;
+static uint8_t limit_switch_initialized = 0u;
+static uint32_t limit_switch_next_periodic_tick = 0u;
+static I2C_FaultContext i2c_fault_contexts[] = {
+    {&hi2c1, "I2C1", 0u, 0u},
+    {&hi2c2, "I2C2", 0u, 0u},
+};
 static int32_t encoder_position_q24[2] = {0};
 static volatile uint8_t fdcan_bus_off_pending = 0u;
 static volatile uint32_t fdcan_bus_off_request_tick = 0u;
@@ -84,6 +98,7 @@ static void MX_ICACHE_Init(void);
 static void MX_FDCAN1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 static void AngleCheck_Run(void);
 static void CAN_InitTxHeaders(void);
@@ -92,6 +107,14 @@ static HAL_StatusTypeDef CAN_SendFrame(FDCAN_TxHeaderTypeDef *header,
 static void CAN_SendEncoderStatus(uint8_t index);
 static int32_t ClampToS24(int32_t value);
 static void PackS24BE(uint8_t *dest, int32_t value);
+static I2C_FaultContext *I2C_GetContext(I2C_HandleTypeDef *handle);
+static HAL_StatusTypeDef I2C_RecoverBus(I2C_FaultContext *ctx);
+static HAL_StatusTypeDef I2C_HandleFault(I2C_FaultContext *ctx);
+static HAL_StatusTypeDef AS5600_ReadAngleWithFallback(I2C_HandleTypeDef *hi2c,
+                                                      I2C_FaultContext *ctx,
+                                                      uint16_t *angle12);
+static void LimitSwitch_Poll(void);
+static void LimitSwitch_RecordEvent(uint8_t state, uint8_t is_change);
 static void LimitSwitch_Service(void);
 static void CAN_ScheduleBusOffRecovery(void);
 static void CAN_ServiceBusOff(void);
@@ -162,6 +185,168 @@ static void PackS24BE(uint8_t *dest, int32_t value) {
   dest[0] = (uint8_t)((uint32_t)clamped >> 16);
   dest[1] = (uint8_t)((uint32_t)clamped >> 8);
   dest[2] = (uint8_t)((uint32_t)clamped);
+}
+
+static I2C_FaultContext *I2C_GetContext(I2C_HandleTypeDef *handle) {
+  if (handle == NULL) {
+    return NULL;
+  }
+  for (size_t i = 0; i < (sizeof(i2c_fault_contexts) / sizeof(i2c_fault_contexts[0])); ++i) {
+    if (i2c_fault_contexts[i].handle == handle) {
+      return &i2c_fault_contexts[i];
+    }
+  }
+  return NULL;
+}
+
+static HAL_StatusTypeDef I2C_RecoverBus(I2C_FaultContext *ctx) {
+  if (ctx == NULL) {
+    return HAL_ERROR;
+  }
+
+  if (HAL_I2C_DeInit(ctx->handle) != HAL_OK) {
+    char line[96];
+    snprintf(line, sizeof(line), "%s: I2C deinit failed\r\n", ctx->name);
+    UART_SendLine(line);
+    return HAL_ERROR;
+  }
+
+  if (HAL_I2C_Init(ctx->handle) != HAL_OK) {
+    char line[96];
+    snprintf(line, sizeof(line), "%s: I2C init failed\r\n", ctx->name);
+    UART_SendLine(line);
+    return HAL_ERROR;
+  }
+
+  if (HAL_I2CEx_ConfigAnalogFilter(ctx->handle, I2C_ANALOGFILTER_ENABLE) != HAL_OK) {
+    char line[96];
+    snprintf(line, sizeof(line), "%s: analog filter cfg failed\r\n", ctx->name);
+    UART_SendLine(line);
+    return HAL_ERROR;
+  }
+
+  if (HAL_I2CEx_ConfigDigitalFilter(ctx->handle, ctx->digital_filter) != HAL_OK) {
+    char line[96];
+    snprintf(line, sizeof(line), "%s: digital filter cfg failed\r\n", ctx->name);
+    UART_SendLine(line);
+    return HAL_ERROR;
+  }
+
+  return HAL_OK;
+}
+
+static HAL_StatusTypeDef I2C_HandleFault(I2C_FaultContext *ctx) {
+  if (ctx == NULL) {
+    return HAL_ERROR;
+  }
+
+  if (ctx->consecutive_failures < UINT32_MAX) {
+    ctx->consecutive_failures++;
+  }
+
+  char line[96];
+  snprintf(line, sizeof(line), "%s fault count=%lu\r\n", ctx->name,
+           (unsigned long)ctx->consecutive_failures);
+  UART_SendLine(line);
+
+  if (ctx->consecutive_failures < I2C_FAULT_RECOVERY_THRESHOLD) {
+    return HAL_ERROR;
+  }
+
+  snprintf(line, sizeof(line), "%s attempting bus recovery\r\n", ctx->name);
+  UART_SendLine(line);
+
+  HAL_StatusTypeDef status = I2C_RecoverBus(ctx);
+  if (status == HAL_OK) {
+    snprintf(line, sizeof(line), "%s recovery succeeded\r\n", ctx->name);
+    UART_SendLine(line);
+    ctx->consecutive_failures = 0u;
+  } else {
+    snprintf(line, sizeof(line), "%s recovery failed\r\n", ctx->name);
+    UART_SendLine(line);
+    if (ctx->consecutive_failures > I2C_FAULT_RECOVERY_THRESHOLD) {
+      ctx->consecutive_failures = I2C_FAULT_RECOVERY_THRESHOLD;
+    }
+  }
+  return status;
+}
+
+static HAL_StatusTypeDef AS5600_ReadAngleWithFallback(I2C_HandleTypeDef *hi2c,
+                                                      I2C_FaultContext *ctx,
+                                                      uint16_t *angle12) {
+  HAL_StatusTypeDef status = AS5600_ReadAngle12(hi2c, angle12);
+  if (ctx == NULL) {
+    return status;
+  }
+
+  if (status == HAL_OK) {
+    ctx->consecutive_failures = 0u;
+    return HAL_OK;
+  }
+
+  print_i2c_error(ctx->name, hi2c);
+  (void)I2C_HandleFault(ctx);
+
+  status = AS5600_ReadAngle12(hi2c, angle12);
+  if (status == HAL_OK) {
+    ctx->consecutive_failures = 0u;
+    return HAL_OK;
+  }
+
+  print_i2c_error(ctx->name, hi2c);
+  if (ctx->consecutive_failures == 0u) {
+    ctx->consecutive_failures = 1u;
+  }
+  return status;
+}
+
+static void LimitSwitch_RecordEvent(uint8_t state, uint8_t is_change) {
+  limit_switch_frame[0] = state;
+  limit_switch_frame[1] = 0u;
+  limit_switch_frame[2] = 0u;
+  limit_switch_frame[3] = 0u;
+  limit_switch_frame[4] = 0u;
+  limit_switch_frame[5] = 0u;
+  limit_switch_frame[6] = 0u;
+  limit_switch_frame[7] = 0u;
+  limit_switch_pending = 1u;
+
+  if (is_change != 0u) {
+    const char *edge_str = (state != 0u) ? "rising" : "falling";
+    char line[64];
+    snprintf(line, sizeof(line),
+             "Limit switch: state=%u edge=%s\r\n",
+             (unsigned int)state, edge_str);
+    UART_SendLine(line);
+  }
+}
+
+static void LimitSwitch_Poll(void) {
+  uint32_t now = HAL_GetTick();
+  GPIO_PinState pin_state = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1);
+  uint8_t state = (pin_state == GPIO_PIN_SET) ? 1u : 0u;
+
+  if (limit_switch_initialized == 0u) {
+    limit_switch_last_state = state;
+    limit_switch_initialized = 1u;
+    limit_switch_next_periodic_tick = now;
+    LimitSwitch_RecordEvent(state, 1u);
+    return;
+  }
+
+  if (state != limit_switch_last_state) {
+    limit_switch_last_state = state;
+    limit_switch_next_periodic_tick = now + 200u;
+    LimitSwitch_RecordEvent(state, 1u);
+    return;
+  }
+
+  if ((int32_t)(now - limit_switch_next_periodic_tick) >= 0) {
+    limit_switch_next_periodic_tick = now + 200u;
+    if (limit_switch_pending == 0u) {
+      LimitSwitch_RecordEvent(state, 0u);
+    }
+  }
 }
 
 static void CAN_InitTxHeaders(void) {
@@ -327,10 +512,11 @@ static void CAN_ServiceBusOff(void) {
 /* USER CODE END 0 */
 
 /**
- * @brief  The application entry point.
- * @retval int
- */
-int main(void) {
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
 
   /* USER CODE BEGIN 1 */
 
@@ -338,8 +524,7 @@ int main(void) {
 
   /* MCU Configuration--------------------------------------------------------*/
 
-  /* Reset of all peripherals, Initializes the Flash interface and the Systick.
-   */
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
 
   /* USER CODE BEGIN Init */
@@ -361,6 +546,7 @@ int main(void) {
   MX_FDCAN1_Init();
   MX_USART2_UART_Init();
   MX_TIM1_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
   CAN_InitTxHeaders();
   if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_BUS_OFF, 0U) !=
@@ -374,8 +560,12 @@ int main(void) {
   if (HAL_TIM_Base_Start_IT(&htim1) != HAL_OK) {
     Error_Handler();
   }
+  if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK) {
+    Error_Handler();
+  }
   AngleCheck_Run();
   CAN_ServiceBusOff();
+  LimitSwitch_Poll();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -404,23 +594,23 @@ int main(void) {
 }
 
 /**
- * @brief System Clock Configuration
- * @retval None
- */
-void SystemClock_Config(void) {
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
   /** Configure the main internal regulator output voltage
-   */
+  */
   __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
 
-  while (!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {
-  }
+  while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
   /** Initializes the RCC Oscillators according to the specified parameters
-   * in the RCC_OscInitTypeDef structure.
-   */
+  * in the RCC_OscInitTypeDef structure.
+  */
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_CSI;
   RCC_OscInitStruct.CSIState = RCC_CSI_ON;
   RCC_OscInitStruct.CSICalibrationValue = RCC_CSICALIBRATION_DEFAULT;
@@ -434,36 +624,39 @@ void SystemClock_Config(void) {
   RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1_VCIRANGE_2;
   RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1_VCORANGE_WIDE;
   RCC_OscInitStruct.PLL.PLLFRACN = 0;
-  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK) {
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Initializes the CPU, AHB and APB buses clocks
-   */
-  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK | RCC_CLOCKTYPE_SYSCLK |
-                                RCC_CLOCKTYPE_PCLK1 | RCC_CLOCKTYPE_PCLK2 |
-                                RCC_CLOCKTYPE_PCLK3;
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
+                              |RCC_CLOCKTYPE_PCLK3;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
   RCC_ClkInitStruct.APB3CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK) {
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5) != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Configure the programming delay
-   */
+  */
   __HAL_FLASH_SET_PROGRAM_DELAY(FLASH_PROGRAMMING_DELAY_2);
 }
 
 /**
- * @brief FDCAN1 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_FDCAN1_Init(void) {
+  * @brief FDCAN1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_FDCAN1_Init(void)
+{
 
   /* USER CODE BEGIN FDCAN1_Init 0 */
 
@@ -477,12 +670,12 @@ static void MX_FDCAN1_Init(void) {
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
   hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
   hfdcan1.Init.AutoRetransmission = ENABLE;
-  hfdcan1.Init.TransmitPause = ENABLE;
+  hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 10;
+  hfdcan1.Init.NominalPrescaler = 5;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
-  hfdcan1.Init.NominalTimeSeg1 = 19;
-  hfdcan1.Init.NominalTimeSeg2 = 5;
+  hfdcan1.Init.NominalTimeSeg1 = 43;
+  hfdcan1.Init.NominalTimeSeg2 = 6;
   hfdcan1.Init.DataPrescaler = 1;
   hfdcan1.Init.DataSyncJumpWidth = 1;
   hfdcan1.Init.DataTimeSeg1 = 1;
@@ -490,20 +683,23 @@ static void MX_FDCAN1_Init(void) {
   hfdcan1.Init.StdFiltersNbr = 0;
   hfdcan1.Init.ExtFiltersNbr = 0;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
-  if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK) {
+  if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN FDCAN1_Init 2 */
 
   /* USER CODE END FDCAN1_Init 2 */
+
 }
 
 /**
- * @brief I2C1 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_I2C1_Init(void) {
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
 
   /* USER CODE BEGIN I2C1_Init 0 */
 
@@ -521,32 +717,37 @@ static void MX_I2C1_Init(void) {
   hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
   hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
   hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c1) != HAL_OK) {
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Configure Analogue filter
-   */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK) {
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Configure Digital filter
-   */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK) {
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
 }
 
 /**
- * @brief I2C2 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_I2C2_Init(void) {
+  * @brief I2C2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C2_Init(void)
+{
 
   /* USER CODE BEGIN I2C2_Init 0 */
 
@@ -564,32 +765,37 @@ static void MX_I2C2_Init(void) {
   hi2c2.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
   hi2c2.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
   hi2c2.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
-  if (HAL_I2C_Init(&hi2c2) != HAL_OK) {
+  if (HAL_I2C_Init(&hi2c2) != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Configure Analogue filter
-   */
-  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK) {
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c2, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
     Error_Handler();
   }
 
   /** Configure Digital filter
-   */
-  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK) {
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c2, 0) != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN I2C2_Init 2 */
 
   /* USER CODE END I2C2_Init 2 */
+
 }
 
 /**
- * @brief ICACHE Initialization Function
- * @param None
- * @retval None
- */
-static void MX_ICACHE_Init(void) {
+  * @brief ICACHE Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ICACHE_Init(void)
+{
 
   /* USER CODE BEGIN ICACHE_Init 0 */
 
@@ -600,24 +806,28 @@ static void MX_ICACHE_Init(void) {
   /* USER CODE END ICACHE_Init 1 */
 
   /** Enable instruction cache in 1-way (direct mapped cache)
-   */
-  if (HAL_ICACHE_ConfigAssociativityMode(ICACHE_1WAY) != HAL_OK) {
+  */
+  if (HAL_ICACHE_ConfigAssociativityMode(ICACHE_1WAY) != HAL_OK)
+  {
     Error_Handler();
   }
-  if (HAL_ICACHE_Enable() != HAL_OK) {
+  if (HAL_ICACHE_Enable() != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN ICACHE_Init 2 */
 
   /* USER CODE END ICACHE_Init 2 */
+
 }
 
 /**
- * @brief TIM1 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_TIM1_Init(void) {
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
 
   /* USER CODE BEGIN TIM1_Init 0 */
 
@@ -636,30 +846,80 @@ static void MX_TIM1_Init(void) {
   htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim1.Init.RepetitionCounter = 0;
   htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
-  if (HAL_TIM_Base_Init(&htim1) != HAL_OK) {
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
     Error_Handler();
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK) {
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK) {
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN TIM1_Init 2 */
 
   /* USER CODE END TIM1_Init 2 */
+
 }
 
 /**
- * @brief USART2 Initialization Function
- * @param None
- * @retval None
- */
-static void MX_USART2_UART_Init(void) {
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 2499;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 999;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
 
   /* USER CODE BEGIN USART2_Init 0 */
 
@@ -679,31 +939,35 @@ static void MX_USART2_UART_Init(void) {
   huart2.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart2.Init.ClockPrescaler = UART_PRESCALER_DIV1;
   huart2.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-  if (HAL_UART_Init(&huart2) != HAL_OK) {
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
     Error_Handler();
   }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) !=
-      HAL_OK) {
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart2, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
     Error_Handler();
   }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) !=
-      HAL_OK) {
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart2, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
     Error_Handler();
   }
-  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK) {
+  if (HAL_UARTEx_DisableFifoMode(&huart2) != HAL_OK)
+  {
     Error_Handler();
   }
   /* USER CODE BEGIN USART2_Init 2 */
 
   /* USER CODE END USART2_Init 2 */
+
 }
 
 /**
- * @brief GPIO Initialization Function
- * @param None
- * @retval None
- */
-static void MX_GPIO_Init(void) {
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
@@ -716,13 +980,9 @@ static void MX_GPIO_Init(void) {
 
   /*Configure GPIO pin : PA1 */
   GPIO_InitStruct.Pin = GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -736,15 +996,15 @@ static void AngleCheck_Run(void) {
 
   uint16_t angle1 = 0;
   uint16_t angle2 = 0;
-  HAL_StatusTypeDef s1 = AS5600_ReadAngle12(&hi2c1, &angle1);
-  HAL_StatusTypeDef s2 = AS5600_ReadAngle12(&hi2c2, &angle2);
+  I2C_FaultContext *i2c1_ctx = I2C_GetContext(&hi2c1);
+  I2C_FaultContext *i2c2_ctx = I2C_GetContext(&hi2c2);
+  HAL_StatusTypeDef s1 = AS5600_ReadAngleWithFallback(&hi2c1, i2c1_ctx, &angle1);
+  HAL_StatusTypeDef s2 = AS5600_ReadAngleWithFallback(&hi2c2, i2c2_ctx, &angle2);
 
   if (s1 != HAL_OK) {
-    print_i2c_error("I2C1", &hi2c1);
     encoder_status_flags[0] |= (ENC_FLAG_SENSOR_FAULT | ENC_FLAG_ERROR_LATCHED);
   }
   if (s2 != HAL_OK) {
-    print_i2c_error("I2C2", &hi2c2);
     encoder_status_flags[1] |= (ENC_FLAG_SENSOR_FAULT | ENC_FLAG_ERROR_LATCHED);
   }
 
@@ -784,35 +1044,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
     if (angle_check_pending < UINT32_MAX) {
       angle_check_pending++;
     }
+  } else if (htim->Instance == TIM2) {
+    LimitSwitch_Poll();
   }
 }
 
 void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) {
-  if (GPIO_Pin == GPIO_PIN_1) {
-    const GPIO_PinState pin_state = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1);
-    uint8_t state = (pin_state == GPIO_PIN_SET) ? 1u : 0u;
-    uint8_t edge_flags = state ? 0x01u : 0x02u;
-    uint16_t event = ++limit_switch_event_counter;
-    uint32_t tick = HAL_GetTick();
-
-    limit_switch_frame[0] = state;
-    limit_switch_frame[1] = edge_flags;
-    limit_switch_frame[2] = (uint8_t)(event >> 8);
-    limit_switch_frame[3] = (uint8_t)(event);
-    limit_switch_frame[4] = (uint8_t)(tick >> 24);
-    limit_switch_frame[5] = (uint8_t)(tick >> 16);
-    limit_switch_frame[6] = (uint8_t)(tick >> 8);
-    limit_switch_frame[7] = (uint8_t)(tick);
-    limit_switch_pending = 1u;
-
-    const char *edge_str = (edge_flags & 0x01u) != 0u ? "rising" : "falling";
-    char line[80];
-    snprintf(line, sizeof(line),
-             "Limit switch: state=%u edge=%s event=%u tick=%lu\r\n",
-             (unsigned int)state, edge_str, (unsigned int)event,
-             (unsigned long)tick);
-    UART_SendLine(line);
-  }
+  (void)GPIO_Pin;
 }
 
 void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef *hfdcan,
@@ -828,10 +1066,11 @@ void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef *hfdcan,
 /* USER CODE END 4 */
 
 /**
- * @brief  This function is executed in case of error occurrence.
- * @retval None
- */
-void Error_Handler(void) {
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
@@ -841,13 +1080,14 @@ void Error_Handler(void) {
 }
 #ifdef USE_FULL_ASSERT
 /**
- * @brief  Reports the name of the source file and the source line number
- *         where the assert_param error has occurred.
- * @param  file: pointer to the source file name
- * @param  line: assert_param error line source number
- * @retval None
- */
-void assert_failed(uint8_t *file, uint32_t line) {
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line
      number, ex: printf("Wrong parameters value: file %s on line %d\r\n", file,
