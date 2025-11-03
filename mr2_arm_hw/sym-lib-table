@@ -1,0 +1,4 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "XT30PW(2+2)-M.G.B")(type "EasyEDA (JLCEDA) Pro")(uri "${KIPRJMOD}/components/XT30PW(2+2)-M.G.B.elibz")(options "")(descr ""))
+)
