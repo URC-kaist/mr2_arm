@@ -22,34 +22,17 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
-#include <string.h>
+#include "app_can.h"
+#include "app_encoder.h"
+#include "app_limit_switch.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-typedef struct {
-  I2C_HandleTypeDef *handle;
-  const char *name;
-  uint32_t consecutive_failures;
-  uint32_t digital_filter;
-} I2C_FaultContext;
-
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define AS5600_I2C_ADDR (0x36u << 1) /* HAL expects 8-bit address */
-#define AS5600_ANGLE_START 0x0Eu
-#define AS5600_STEPS 4096.0f
-#define CAN_ID_ENCODER1_STATUS 0x180U
-#define CAN_ID_ENCODER2_STATUS 0x182U
-#define CAN_ID_LIMIT_SWITCH 0x181U
-#define ENC_FLAG_INDEX_SEEN 0x01u
-#define ENC_FLAG_ERROR_LATCHED 0x02u
-#define ENC_FLAG_SENSOR_FAULT 0x04u
-#define ENC_FLAG_OVER_SPEED 0x08u
-#define CAN_ERROR_FLAG_BUS_OFF (1UL << 9)
-#define I2C_FAULT_RECOVERY_THRESHOLD 2u
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -70,23 +53,6 @@ TIM_HandleTypeDef htim2;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-static volatile uint32_t angle_check_pending = 0UL;
-static FDCAN_TxHeaderTypeDef encoder_status_headers[2];
-static FDCAN_TxHeaderTypeDef limit_switch_header;
-static uint8_t encoder_status_flags[2] = {0u, 0u};
-static volatile uint8_t limit_switch_pending = 0u;
-static uint8_t limit_switch_frame[8] = {0};
-static uint8_t limit_switch_last_state = 0u;
-static uint8_t limit_switch_initialized = 0u;
-static uint32_t limit_switch_next_periodic_tick = 0u;
-static I2C_FaultContext i2c_fault_contexts[] = {
-    {&hi2c1, "I2C1", 0u, 0u},
-    {&hi2c2, "I2C2", 0u, 0u},
-};
-static int32_t encoder_position_q24[2] = {0};
-static volatile uint8_t fdcan_bus_off_pending = 0u;
-static volatile uint32_t fdcan_bus_off_request_tick = 0u;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,425 +61,16 @@ static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_ICACHE_Init(void);
-static void MX_FDCAN1_Init(void);
+void MX_FDCAN1_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
-static void AngleCheck_Run(void);
-static void CAN_InitTxHeaders(void);
-static HAL_StatusTypeDef CAN_SendFrame(FDCAN_TxHeaderTypeDef *header,
-                                       uint8_t data[8]);
-static void CAN_SendEncoderStatus(uint8_t index);
-static int32_t ClampToS24(int32_t value);
-static void PackS24BE(uint8_t *dest, int32_t value);
-static I2C_FaultContext *I2C_GetContext(I2C_HandleTypeDef *handle);
-static HAL_StatusTypeDef I2C_RecoverBus(I2C_FaultContext *ctx);
-static HAL_StatusTypeDef I2C_HandleFault(I2C_FaultContext *ctx);
-static HAL_StatusTypeDef AS5600_ReadAngleWithFallback(I2C_HandleTypeDef *hi2c,
-                                                      I2C_FaultContext *ctx,
-                                                      uint16_t *angle12);
-static void LimitSwitch_Poll(void);
-static void LimitSwitch_RecordEvent(uint8_t state, uint8_t is_change);
-static void LimitSwitch_Service(void);
-static void CAN_ScheduleBusOffRecovery(void);
-static void CAN_ServiceBusOff(void);
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 extern void initialise_monitor_handles(void);
-
-static HAL_StatusTypeDef AS5600_ReadAngle12(I2C_HandleTypeDef *hi2c,
-                                            uint16_t *angle12) {
-  uint8_t buf[2] = {0};
-  HAL_StatusTypeDef st =
-      HAL_I2C_Mem_Read(hi2c, AS5600_I2C_ADDR, AS5600_ANGLE_START,
-                       I2C_MEMADD_SIZE_8BIT, buf, sizeof(buf), 10);
-  if (st != HAL_OK) {
-    return st;
-  }
-
-  *angle12 = (uint16_t)(((buf[0] & 0x0Fu) << 8) | buf[1]);
-  return HAL_OK;
-}
-
-static void UART_SendLine(const char *s) {
-  size_t len = strlen(s);
-  HAL_UART_Transmit(&huart2, (uint8_t *)s, (uint16_t)len, 50);
-}
-
-static void print_i2c_error(const char *tag, I2C_HandleTypeDef *hi2c) {
-  uint32_t err = HAL_I2C_GetError(hi2c);
-  char msg[96];
-  snprintf(msg, sizeof(msg), "%s ERR=0x%08lX%s%s%s%s%s%s\r\n", tag,
-           (unsigned long)err, (err & HAL_I2C_ERROR_BERR) ? " BERR" : "",
-           (err & HAL_I2C_ERROR_ARLO) ? " ARLO" : "",
-           (err & HAL_I2C_ERROR_AF) ? " AF(NACK)" : "",
-           (err & HAL_I2C_ERROR_OVR) ? " OVR" : "",
-           (err & HAL_I2C_ERROR_DMA) ? " DMA" : "",
-           (err & HAL_I2C_ERROR_TIMEOUT) ? " TIMEOUT" : "");
-  UART_SendLine(msg);
-}
-
-static HAL_StatusTypeDef probe_as5600(I2C_HandleTypeDef *hi2c,
-                                      const char *tag) {
-  HAL_StatusTypeDef st = HAL_I2C_IsDeviceReady(hi2c, AS5600_I2C_ADDR, 3, 10);
-  char line[64];
-  if (st != HAL_OK) {
-    snprintf(line, sizeof(line), "%s: NACK @0x36\r\n", tag);
-    UART_SendLine(line);
-    print_i2c_error(tag, hi2c);
-  } else {
-    snprintf(line, sizeof(line), "%s: OK\r\n", tag);
-    UART_SendLine(line);
-  }
-  return st;
-}
-
-static int32_t ClampToS24(int32_t value) {
-  if (value > 0x7FFFFF) {
-    return 0x7FFFFF;
-  }
-  if (value < -0x800000) {
-    return -0x800000;
-  }
-  return value;
-}
-
-static void PackS24BE(uint8_t *dest, int32_t value) {
-  const int32_t clamped = ClampToS24(value);
-  dest[0] = (uint8_t)((uint32_t)clamped >> 16);
-  dest[1] = (uint8_t)((uint32_t)clamped >> 8);
-  dest[2] = (uint8_t)((uint32_t)clamped);
-}
-
-static I2C_FaultContext *I2C_GetContext(I2C_HandleTypeDef *handle) {
-  if (handle == NULL) {
-    return NULL;
-  }
-  for (size_t i = 0;
-       i < (sizeof(i2c_fault_contexts) / sizeof(i2c_fault_contexts[0])); ++i) {
-    if (i2c_fault_contexts[i].handle == handle) {
-      return &i2c_fault_contexts[i];
-    }
-  }
-  return NULL;
-}
-
-static HAL_StatusTypeDef I2C_RecoverBus(I2C_FaultContext *ctx) {
-  if (ctx == NULL) {
-    return HAL_ERROR;
-  }
-
-  if (HAL_I2C_DeInit(ctx->handle) != HAL_OK) {
-    char line[96];
-    snprintf(line, sizeof(line), "%s: I2C deinit failed\r\n", ctx->name);
-    UART_SendLine(line);
-    return HAL_ERROR;
-  }
-
-  if (HAL_I2C_Init(ctx->handle) != HAL_OK) {
-    char line[96];
-    snprintf(line, sizeof(line), "%s: I2C init failed\r\n", ctx->name);
-    UART_SendLine(line);
-    return HAL_ERROR;
-  }
-
-  if (HAL_I2CEx_ConfigAnalogFilter(ctx->handle, I2C_ANALOGFILTER_ENABLE) !=
-      HAL_OK) {
-    char line[96];
-    snprintf(line, sizeof(line), "%s: analog filter cfg failed\r\n", ctx->name);
-    UART_SendLine(line);
-    return HAL_ERROR;
-  }
-
-  if (HAL_I2CEx_ConfigDigitalFilter(ctx->handle, ctx->digital_filter) !=
-      HAL_OK) {
-    char line[96];
-    snprintf(line, sizeof(line), "%s: digital filter cfg failed\r\n",
-             ctx->name);
-    UART_SendLine(line);
-    return HAL_ERROR;
-  }
-
-  return HAL_OK;
-}
-
-static HAL_StatusTypeDef I2C_HandleFault(I2C_FaultContext *ctx) {
-  if (ctx == NULL) {
-    return HAL_ERROR;
-  }
-
-  if (ctx->consecutive_failures < UINT32_MAX) {
-    ctx->consecutive_failures++;
-  }
-
-  char line[96];
-  snprintf(line, sizeof(line), "%s fault count=%lu\r\n", ctx->name,
-           (unsigned long)ctx->consecutive_failures);
-  UART_SendLine(line);
-
-  if (ctx->consecutive_failures < I2C_FAULT_RECOVERY_THRESHOLD) {
-    return HAL_ERROR;
-  }
-
-  snprintf(line, sizeof(line), "%s attempting bus recovery\r\n", ctx->name);
-  UART_SendLine(line);
-
-  HAL_StatusTypeDef status = I2C_RecoverBus(ctx);
-  if (status == HAL_OK) {
-    snprintf(line, sizeof(line), "%s recovery succeeded\r\n", ctx->name);
-    UART_SendLine(line);
-    ctx->consecutive_failures = 0u;
-  } else {
-    snprintf(line, sizeof(line), "%s recovery failed\r\n", ctx->name);
-    UART_SendLine(line);
-    if (ctx->consecutive_failures > I2C_FAULT_RECOVERY_THRESHOLD) {
-      ctx->consecutive_failures = I2C_FAULT_RECOVERY_THRESHOLD;
-    }
-  }
-  return status;
-}
-
-static HAL_StatusTypeDef AS5600_ReadAngleWithFallback(I2C_HandleTypeDef *hi2c,
-                                                      I2C_FaultContext *ctx,
-                                                      uint16_t *angle12) {
-  HAL_StatusTypeDef status = AS5600_ReadAngle12(hi2c, angle12);
-  if (ctx == NULL) {
-    return status;
-  }
-
-  if (status == HAL_OK) {
-    ctx->consecutive_failures = 0u;
-    return HAL_OK;
-  }
-
-  print_i2c_error(ctx->name, hi2c);
-  (void)I2C_HandleFault(ctx);
-
-  status = AS5600_ReadAngle12(hi2c, angle12);
-  if (status == HAL_OK) {
-    ctx->consecutive_failures = 0u;
-    return HAL_OK;
-  }
-
-  print_i2c_error(ctx->name, hi2c);
-  if (ctx->consecutive_failures == 0u) {
-    ctx->consecutive_failures = 1u;
-  }
-  return status;
-}
-
-static void LimitSwitch_RecordEvent(uint8_t state, uint8_t is_change) {
-  limit_switch_frame[0] = state;
-  limit_switch_frame[1] = 0u;
-  limit_switch_frame[2] = 0u;
-  limit_switch_frame[3] = 0u;
-  limit_switch_frame[4] = 0u;
-  limit_switch_frame[5] = 0u;
-  limit_switch_frame[6] = 0u;
-  limit_switch_frame[7] = 0u;
-  limit_switch_pending = 1u;
-
-  if (is_change != 0u) {
-    const char *edge_str = (state != 0u) ? "rising" : "falling";
-    char line[64];
-    snprintf(line, sizeof(line), "Limit switch: state=%u edge=%s\r\n",
-             (unsigned int)state, edge_str);
-    UART_SendLine(line);
-  }
-}
-
-static void LimitSwitch_Poll(void) {
-  uint32_t now = HAL_GetTick();
-  GPIO_PinState pin_state = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1);
-  uint8_t state = (pin_state == GPIO_PIN_SET) ? 1u : 0u;
-
-  if (limit_switch_initialized == 0u) {
-    limit_switch_last_state = state;
-    limit_switch_initialized = 1u;
-    limit_switch_next_periodic_tick = now;
-    LimitSwitch_RecordEvent(state, 1u);
-    return;
-  }
-
-  if (state != limit_switch_last_state) {
-    limit_switch_last_state = state;
-    limit_switch_next_periodic_tick = now + 200u;
-    LimitSwitch_RecordEvent(state, 1u);
-    return;
-  }
-
-  if ((int32_t)(now - limit_switch_next_periodic_tick) >= 0) {
-    limit_switch_next_periodic_tick = now + 200u;
-    if (limit_switch_pending == 0u) {
-      LimitSwitch_RecordEvent(state, 0u);
-    }
-  }
-}
-
-static void CAN_InitTxHeaders(void) {
-  FDCAN_TxHeaderTypeDef base = {0};
-  base.IdType = FDCAN_STANDARD_ID;
-  base.TxFrameType = FDCAN_DATA_FRAME;
-  base.DataLength = FDCAN_DLC_BYTES_8;
-  base.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-  base.BitRateSwitch = FDCAN_BRS_OFF;
-  base.FDFormat = FDCAN_CLASSIC_CAN;
-  base.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-  base.MessageMarker = 0;
-
-  encoder_status_headers[0] = base;
-  encoder_status_headers[1] = base;
-  encoder_status_headers[0].Identifier = CAN_ID_ENCODER1_STATUS;
-  encoder_status_headers[1].Identifier = CAN_ID_ENCODER2_STATUS;
-
-  limit_switch_header = base;
-  limit_switch_header.Identifier = CAN_ID_LIMIT_SWITCH;
-}
-
-static HAL_StatusTypeDef CAN_SendFrame(FDCAN_TxHeaderTypeDef *header,
-                                       uint8_t data[8]) {
-  if (HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1) == 0U) {
-    char line[64];
-    snprintf(line, sizeof(line), "CAN TX busy (fifo full), id=0x%03lX\r\n",
-             (unsigned long)header->Identifier);
-    UART_SendLine(line);
-    FDCAN_ProtocolStatusTypeDef proto = {0};
-    (void)HAL_FDCAN_GetProtocolStatus(&hfdcan1, &proto);
-    uint32_t err = HAL_FDCAN_GetError(&hfdcan1);
-    snprintf(line, sizeof(line),
-             "CAN diag: act=%u lec=%u bo=%u err=0x%08lX\r\n",
-             (unsigned int)proto.Activity, (unsigned int)proto.LastErrorCode,
-             (unsigned int)proto.BusOff, (unsigned long)err);
-    UART_SendLine(line);
-    if ((proto.BusOff != 0U) || ((err & CAN_ERROR_FLAG_BUS_OFF) != 0U)) {
-      CAN_ScheduleBusOffRecovery();
-    }
-    return HAL_BUSY;
-  }
-
-  HAL_StatusTypeDef status =
-      HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, header, data);
-  if (status != HAL_OK) {
-    char line[96];
-    snprintf(line, sizeof(line), "CAN TX failed status=%ld id=0x%03lX\r\n",
-             (long)status, (unsigned long)header->Identifier);
-    UART_SendLine(line);
-    FDCAN_ProtocolStatusTypeDef proto = {0};
-    (void)HAL_FDCAN_GetProtocolStatus(&hfdcan1, &proto);
-    uint32_t err = HAL_FDCAN_GetError(&hfdcan1);
-    snprintf(line, sizeof(line),
-             "CAN diag: act=%u lec=%u bo=%u err=0x%08lX\r\n",
-             (unsigned int)proto.Activity, (unsigned int)proto.LastErrorCode,
-             (unsigned int)proto.BusOff, (unsigned long)err);
-    UART_SendLine(line);
-    if ((proto.BusOff != 0U) || ((err & CAN_ERROR_FLAG_BUS_OFF) != 0U)) {
-      CAN_ScheduleBusOffRecovery();
-    }
-  }
-  return status;
-}
-
-static void CAN_SendEncoderStatus(uint8_t index) {
-  if (index >= 2U) {
-    return;
-  }
-  uint8_t payload[8] = {0};
-  PackS24BE(&payload[0], encoder_position_q24[index]);
-  payload[3] = encoder_status_flags[index];
-  (void)CAN_SendFrame(&encoder_status_headers[index], payload);
-}
-
-static void LimitSwitch_Service(void) {
-  if (limit_switch_pending == 0U) {
-    return;
-  }
-
-  uint8_t payload[8];
-  uint8_t have_frame = 0U;
-
-  uint32_t primask = __get_PRIMASK();
-  __disable_irq();
-  if (limit_switch_pending != 0U) {
-    memcpy(payload, limit_switch_frame, sizeof(payload));
-    limit_switch_pending = 0U;
-    have_frame = 1U;
-  }
-  if (primask == 0U) {
-    __enable_irq();
-  }
-
-  if (have_frame == 0U) {
-    return;
-  }
-
-  HAL_StatusTypeDef tx_status = CAN_SendFrame(&limit_switch_header, payload);
-  if (tx_status == HAL_OK) {
-    return;
-  }
-
-  uint32_t primask2 = __get_PRIMASK();
-  __disable_irq();
-  memcpy(limit_switch_frame, payload, sizeof(limit_switch_frame));
-  limit_switch_pending = 1U;
-  if (primask2 == 0U) {
-    __enable_irq();
-  }
-}
-
-static void CAN_ScheduleBusOffRecovery(void) {
-  if (fdcan_bus_off_pending == 0u) {
-    fdcan_bus_off_pending = 1u;
-    fdcan_bus_off_request_tick = HAL_GetTick();
-  }
-}
-
-static void CAN_ServiceBusOff(void) {
-  if (fdcan_bus_off_pending == 0u) {
-    return;
-  }
-
-  uint32_t now = HAL_GetTick();
-  if ((uint32_t)(now - fdcan_bus_off_request_tick) < 200u) {
-    return;
-  }
-
-  UART_SendLine("CAN bus-off recovery start\r\n");
-
-  if (HAL_FDCAN_Stop(&hfdcan1) != HAL_OK) {
-    UART_SendLine("CAN stop failed, retry later\r\n");
-    fdcan_bus_off_request_tick = now;
-    return;
-  }
-
-  if (HAL_FDCAN_DeInit(&hfdcan1) != HAL_OK) {
-    UART_SendLine("CAN deinit failed, retry later\r\n");
-    fdcan_bus_off_request_tick = now;
-    return;
-  }
-
-  MX_FDCAN1_Init();
-  CAN_InitTxHeaders();
-
-  if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK) {
-    UART_SendLine("CAN restart failed, retry later\r\n");
-    fdcan_bus_off_request_tick = now;
-    return;
-  }
-
-  if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_BUS_OFF, 0U) !=
-      HAL_OK) {
-    UART_SendLine("CAN notification re-arm failed\r\n");
-  }
-
-  UART_SendLine("CAN bus-off recovery complete\r\n");
-  fdcan_bus_off_pending = 0u;
-  CAN_SendEncoderStatus(0u);
-  CAN_SendEncoderStatus(1u);
-}
 /* USER CODE END 0 */
 
 /**
@@ -556,7 +113,9 @@ int main(void) {
   MX_TIM1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-  CAN_InitTxHeaders();
+  AppCAN_Init();
+  AppEncoder_Init();
+  AppLimitSwitch_Init();
   if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_BUS_OFF, 0U) !=
       HAL_OK) {
     Error_Handler();
@@ -570,9 +129,10 @@ int main(void) {
   if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK) {
     Error_Handler();
   }
-  AngleCheck_Run();
-  CAN_ServiceBusOff();
-  LimitSwitch_Poll();
+  AppEncoder_RequestMeasurement();
+  (void)AppEncoder_Service();
+  AppCAN_ServiceBusOff();
+  AppLimitSwitch_Poll();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -581,17 +141,15 @@ int main(void) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    LimitSwitch_Service();
-    CAN_ServiceBusOff();
+    AppLimitSwitch_Service();
+    AppCAN_ServiceBusOff();
 
-    if (angle_check_pending > 0UL) {
-      angle_check_pending--;
-      AngleCheck_Run();
-      CAN_ServiceBusOff();
+    if (AppEncoder_Service()) {
+      AppCAN_ServiceBusOff();
       continue;
     }
 
-    if (limit_switch_pending != 0U) {
+    if (AppLimitSwitch_HasPending()) {
       continue;
     }
 
@@ -660,7 +218,7 @@ void SystemClock_Config(void) {
  * @param None
  * @retval None
  */
-static void MX_FDCAN1_Init(void) {
+void MX_FDCAN1_Init(void) {
 
   /* USER CODE BEGIN FDCAN1_Init 0 */
 
@@ -951,10 +509,8 @@ static void MX_GPIO_Init(void) {
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
-  /*Configure GPIO pins : PA1 SW1_NC_Pin SW1_NO_Pin SW2_NC_Pin
-                           SW2_NO_Pin */
-  GPIO_InitStruct.Pin =
-      GPIO_PIN_1 | SW1_NC_Pin | SW1_NO_Pin | SW2_NC_Pin | SW2_NO_Pin;
+  /*Configure GPIO pins : SW1_NC_Pin SW1_NO_Pin SW2_NC_Pin SW2_NO_Pin */
+  GPIO_InitStruct.Pin = SW1_NC_Pin | SW1_NO_Pin | SW2_NC_Pin | SW2_NO_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -965,76 +521,18 @@ static void MX_GPIO_Init(void) {
 }
 
 /* USER CODE BEGIN 4 */
-static void AngleCheck_Run(void) {
-  probe_as5600(&hi2c1, "I2C1");
-  probe_as5600(&hi2c2, "I2C2");
-
-  uint16_t angle1 = 0;
-  uint16_t angle2 = 0;
-  I2C_FaultContext *i2c1_ctx = I2C_GetContext(&hi2c1);
-  I2C_FaultContext *i2c2_ctx = I2C_GetContext(&hi2c2);
-  HAL_StatusTypeDef s1 =
-      AS5600_ReadAngleWithFallback(&hi2c1, i2c1_ctx, &angle1);
-  HAL_StatusTypeDef s2 =
-      AS5600_ReadAngleWithFallback(&hi2c2, i2c2_ctx, &angle2);
-
-  if (s1 != HAL_OK) {
-    encoder_status_flags[0] |= (ENC_FLAG_SENSOR_FAULT | ENC_FLAG_ERROR_LATCHED);
-  }
-  if (s2 != HAL_OK) {
-    encoder_status_flags[1] |= (ENC_FLAG_SENSOR_FAULT | ENC_FLAG_ERROR_LATCHED);
-  }
-
-  if (s1 == HAL_OK) {
-    encoder_status_flags[0] |= ENC_FLAG_INDEX_SEEN;
-    encoder_status_flags[0] &= (uint8_t)~ENC_FLAG_SENSOR_FAULT;
-    int32_t centered = ((int32_t)angle1 - 2048) << 12;
-    encoder_position_q24[0] = ClampToS24(centered);
-  }
-  if (s2 == HAL_OK) {
-    encoder_status_flags[1] |= ENC_FLAG_INDEX_SEEN;
-    encoder_status_flags[1] &= (uint8_t)~ENC_FLAG_SENSOR_FAULT;
-    int32_t centered = ((int32_t)angle2 - 2048) << 12;
-    encoder_position_q24[1] = ClampToS24(centered);
-  }
-
-  const float deg1 = (angle1 * 360.0f) / AS5600_STEPS;
-  const float deg2 = (angle2 * 360.0f) / AS5600_STEPS;
-
-  char line[96];
-  if ((s1 == HAL_OK) && (s2 == HAL_OK)) {
-    snprintf(line, sizeof(line), "A1=%u (%.2fdeg), A2=%u (%.2fdeg)\r\n", angle1,
-             deg1, angle2, deg2);
-  } else {
-    snprintf(line, sizeof(line), "ERR A1=%u (%.2fdeg), A2=%u (%.2fdeg)\r\n",
-             angle1, deg1, angle2, deg2);
-  }
-
-  UART_SendLine(line);
-
-  CAN_SendEncoderStatus(0U);
-  CAN_SendEncoderStatus(1U);
-}
-
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   if (htim->Instance == TIM1) {
-    if (angle_check_pending < UINT32_MAX) {
-      angle_check_pending++;
-    }
+    AppEncoder_OnSchedulerTick();
   } else if (htim->Instance == TIM2) {
-    LimitSwitch_Poll();
+    AppLimitSwitch_Poll();
   }
 }
-
-void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin) { (void)GPIO_Pin; }
 
 void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef *hfdcan,
                                    uint32_t ErrorStatusITs) {
   if (hfdcan == &hfdcan1) {
-    if ((ErrorStatusITs & FDCAN_IT_BUS_OFF) != 0U) {
-      UART_SendLine("CAN bus-off interrupt\r\n");
-      CAN_ScheduleBusOffRecovery();
-    }
+    AppCAN_HandleErrorStatus(ErrorStatusITs);
   }
 }
 
@@ -1046,8 +544,13 @@ void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef *hfdcan,
  */
 void Error_Handler(void) {
   /* USER CODE BEGIN Error_Handler_Debug */
-  /* User can add his own implementation to report the HAL error return state */
+  /* Log fault context before performing a system reset */
+  uint32_t tick = HAL_GetTick();
+  printf("Error_Handler invoked at %lu ms, resetting MCU\r\n",
+         (unsigned long)tick);
+  fflush(stdout);
   __disable_irq();
+  NVIC_SystemReset();
   while (1) {
   }
   /* USER CODE END Error_Handler_Debug */
