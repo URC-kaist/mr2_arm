@@ -6,7 +6,9 @@
 #include "stm32h5xx_hal_fdcan.h"
 
 extern FDCAN_HandleTypeDef hfdcan1;
-extern void MX_FDCAN1_Init(void);
+/* USER CODE BEGIN FDCAN_REINIT_EXTERN */
+extern void App_FDCAN1_Reinit(void);
+/* USER CODE END FDCAN_REINIT_EXTERN */
 
 #define CAN_ERROR_FLAG_BUS_OFF (1UL << 9)
 #define APP_CAN_MAX_CALLBACKS 4U
@@ -122,7 +124,9 @@ void AppCAN_ServiceBusOff(void) {
     return;
   }
 
-  MX_FDCAN1_Init();
+  /* USER CODE BEGIN FDCAN_REINIT_CALL */
+  App_FDCAN1_Reinit();
+  /* USER CODE END FDCAN_REINIT_CALL */
 
   if (HAL_FDCAN_Start(&hfdcan1) != HAL_OK) {
     printf("CAN restart failed, retry later\r\n");

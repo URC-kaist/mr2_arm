@@ -29,35 +29,13 @@
 #include <time.h>
 #include <sys/time.h>
 #include <sys/times.h>
-#include "stm32h5xx.h"
 
-#define SEMIHOSTING_SYS_WRITEC 0x03
-
-static volatile uint8_t semihosting_active = 0U;
-
-static inline void semihosting_write_char(char value)
-{
-#if defined(__GNUC__)
-  if (semihosting_active == 0U) {
-    return;
-  }
-  char ch = value;
-  __asm volatile(
-      "mov r0, %0\n"
-      "mov r1, %1\n"
-      "bkpt 0xAB\n"
-      :
-      : "r"(SEMIHOSTING_SYS_WRITEC), "r"(&ch)
-      : "r0", "r1", "memory");
-#else
-  (void)value;
-#endif
-}
-
-int __io_putchar(int ch);
-int __io_getchar(void) __attribute__((weak));
 
 /* Variables */
+extern int __io_putchar(int ch) __attribute__((weak));
+extern int __io_getchar(void) __attribute__((weak));
+
+
 char *__env[1] = { 0 };
 char **environ = __env;
 
@@ -65,11 +43,6 @@ char **environ = __env;
 /* Functions */
 void initialise_monitor_handles()
 {
-  if ((CoreDebug->DHCSR & CoreDebug_DHCSR_C_DEBUGEN_Msk) != 0U) {
-    semihosting_active = 1U;
-  } else {
-    semihosting_active = 0U;
-  }
 }
 
 int _getpid(void)
@@ -104,28 +77,16 @@ __attribute__((weak)) int _read(int file, char *ptr, int len)
   return len;
 }
 
-int _write(int file, char *ptr, int len)
+__attribute__((weak)) int _write(int file, char *ptr, int len)
 {
   (void)file;
-  if ((ptr == NULL) || (len <= 0)) {
-    return 0;
-  }
-  for (int idx = 0; idx < len; idx++) {
-    semihosting_write_char(ptr[idx]);
+  int DataIdx;
+
+  for (DataIdx = 0; DataIdx < len; DataIdx++)
+  {
+    __io_putchar(*ptr++);
   }
   return len;
-}
-
-int __io_putchar(int ch)
-{
-  semihosting_write_char((char)ch);
-  return ch;
-}
-
-__attribute__((weak)) int __io_getchar(void)
-{
-  (void)semihosting_active;
-  return -1;
 }
 
 int _close(int file)

@@ -40,8 +40,8 @@ Firmware targeting the STM32H523 MCU that supervises two AS5600 magnetic encoder
 - The callback defers to `AppEncoder_OnSchedulerTick()`, allowing the main loop to service encoder polling at ~10 Hz via `AppEncoder_Service()`.
 - Startup logic requests and processes one encoder sample before the first timer tick so the CAN bus is primed immediately after boot.
 
-### Debug Output (Semihosting)
-- Simple semihosting-based logging via `Semihosting_SendLine()` for probe results and angle readouts.
+### Debug Output (UART)
+- `printf` is retargeted to `USART2` at 115 200 baud via `retarget.c`; all logs go out over that UART.
 
 ## CAN Interface
 Classic CAN (FDCAN1), 11-bit standard IDs, FD features disabled, no CRC inside the payloads (CAN handles CRC).
@@ -77,6 +77,7 @@ Notes (apply to both encoder status frames):
 
 Notes:
 - TIM2-driven sampling ensures new levels are observed within 2 ms. The firmware queues an out-of-band frame as soon as a state or fault change is detected.
+
 - While the contacts remain valid, status frames repeat every 200 ms. When a fault persists, transmissions are throttled to once every 500 ms until the inputs recover.
 - Frames are queued from the timer callback and emitted in the main loop; if the TX FIFO is full the latest payload is retried on the next pass.
 
