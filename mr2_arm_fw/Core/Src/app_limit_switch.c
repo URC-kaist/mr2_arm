@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "app_can.h"
+#include "app_config.h"
 #include "main.h"
 
 #define LIMIT_SW1_NC_MASK (1u << 0)
@@ -14,8 +15,7 @@
 #define LIMIT_SW2_NO_MASK (1u << 3)
 #define LIMIT_SWITCH_PERIODIC_MS 200u
 #define LIMIT_SWITCH_FAULT_DEADTIME_MS 500u
-#define CAN_ID_LIMIT_SWITCH1 0x181U
-#define CAN_ID_LIMIT_SWITCH2 0x183U
+#define CAN_ID_LIMIT_SWITCH_BASE_DEFAULT 0x180U
 
 typedef struct {
   uint8_t mask_nc;
@@ -29,12 +29,20 @@ typedef struct {
   uint8_t last_fault;
   uint32_t next_periodic_tick;
   uint32_t next_fault_allowed_tick;
+  uint8_t enabled;
 } AppLimitSwitchChannel;
 
 static AppLimitSwitchChannel limit_switch_channels[2] = {
-    {.mask_nc = LIMIT_SW1_NC_MASK, .mask_no = LIMIT_SW1_NO_MASK, .name = "SW1"},
-    {.mask_nc = LIMIT_SW2_NC_MASK, .mask_no = LIMIT_SW2_NO_MASK, .name = "SW2"},
+    {.mask_nc = LIMIT_SW1_NC_MASK,
+     .mask_no = LIMIT_SW1_NO_MASK,
+     .name = "SW1",
+     .enabled = 1u},
+    {.mask_nc = LIMIT_SW2_NC_MASK,
+     .mask_no = LIMIT_SW2_NO_MASK,
+     .name = "SW2",
+     .enabled = 1u},
 };
+static uint16_t limit_switch_can_base_id = CAN_ID_LIMIT_SWITCH_BASE_DEFAULT;
 
 static void AppLimitSwitch_ChannelQueue(AppLimitSwitchChannel *ch,
                                         uint8_t state, uint8_t fault,
@@ -42,6 +50,8 @@ static void AppLimitSwitch_ChannelQueue(AppLimitSwitchChannel *ch,
 static uint8_t AppLimitSwitch_ReadPins(void);
 static void AppLimitSwitch_OnBusReset(void);
 static void AppLimitSwitch_RefreshHeaders(void);
+static uint8_t AppLimitSwitch_ChannelEnabled(size_t index);
+static uint32_t AppLimitSwitch_GetId(size_t index);
 
 void AppLimitSwitch_Init(void) {
   for (size_t i = 0; i < (sizeof(limit_switch_channels) /
@@ -55,12 +65,48 @@ void AppLimitSwitch_Init(void) {
     ch->next_periodic_tick = 0u;
     ch->next_fault_allowed_tick = 0u;
     memset(ch->frame, 0, sizeof(ch->frame));
+    ch->enabled = 1u;
   }
   AppLimitSwitch_RefreshHeaders();
   AppCAN_RegisterBusResetCallback(AppLimitSwitch_OnBusReset);
 }
 
+void AppLimitSwitch_ApplyConfig(const AppConfig *cfg) {
+  if (cfg == NULL) {
+    return;
+  }
+
+  if (cfg->can_base_id <= 0x7FCu) {
+    limit_switch_can_base_id = cfg->can_base_id;
+  }
+  if (cfg->can_id_sw1 != 0u) {
+    limit_switch_channels[0].header.Identifier = cfg->can_id_sw1;
+  }
+  if (cfg->can_id_sw2 != 0u) {
+    limit_switch_channels[1].header.Identifier = cfg->can_id_sw2;
+  }
+
+  for (size_t i = 0;
+       i < (sizeof(limit_switch_channels) / sizeof(limit_switch_channels[0]));
+       ++i) {
+    AppLimitSwitchChannel *ch = &limit_switch_channels[i];
+    const uint8_t enable_req =
+        (i == 0) ? (cfg->enable_sw1 != 0u) : (cfg->enable_sw2 != 0u);
+    ch->enabled = enable_req;
+    if (enable_req == 0u) {
+      ch->pending = 0u;
+    }
+  }
+
+  AppLimitSwitch_RefreshHeaders();
+}
+
 void AppLimitSwitch_Poll(void) {
+  if ((AppLimitSwitch_ChannelEnabled(0U) == 0u) &&
+      (AppLimitSwitch_ChannelEnabled(1U) == 0u)) {
+    return;
+  }
+
   uint32_t now = HAL_GetTick();
   uint8_t raw_mask = AppLimitSwitch_ReadPins();
 
@@ -68,6 +114,9 @@ void AppLimitSwitch_Poll(void) {
                               sizeof(limit_switch_channels[0]));
        ++idx) {
     AppLimitSwitchChannel *ch = &limit_switch_channels[idx];
+    if (ch->enabled == 0u) {
+      continue;
+    }
     uint8_t raw_nc = (uint8_t)((raw_mask & ch->mask_nc) != 0u ? 1u : 0u);
     uint8_t raw_no = (uint8_t)((raw_mask & ch->mask_no) != 0u ? 1u : 0u);
     uint8_t fault = (uint8_t)((raw_nc == raw_no) ? 1u : 0u);
@@ -130,6 +179,9 @@ bool AppLimitSwitch_Service(void) {
                           sizeof(limit_switch_channels[0]));
        ++i) {
     AppLimitSwitchChannel *ch = &limit_switch_channels[i];
+    if (ch->enabled == 0u) {
+      continue;
+    }
     if (ch->pending == 0U) {
       continue;
     }
@@ -173,7 +225,8 @@ bool AppLimitSwitch_HasPending(void) {
   for (size_t i = 0; i < (sizeof(limit_switch_channels) /
                           sizeof(limit_switch_channels[0]));
        ++i) {
-    if (limit_switch_channels[i].pending != 0U) {
+    if ((limit_switch_channels[i].enabled != 0u) &&
+        (limit_switch_channels[i].pending != 0U)) {
       return true;
     }
   }
@@ -181,10 +234,10 @@ bool AppLimitSwitch_HasPending(void) {
 }
 
 static void AppLimitSwitch_RefreshHeaders(void) {
-  AppCAN_InitHeader(&limit_switch_channels[0].header, CAN_ID_LIMIT_SWITCH1,
-                    FDCAN_DLC_BYTES_2);
-  AppCAN_InitHeader(&limit_switch_channels[1].header, CAN_ID_LIMIT_SWITCH2,
-                    FDCAN_DLC_BYTES_2);
+  AppCAN_InitHeader(&limit_switch_channels[0].header,
+                    AppLimitSwitch_GetId(0U), FDCAN_DLC_BYTES_2);
+  AppCAN_InitHeader(&limit_switch_channels[1].header,
+                    AppLimitSwitch_GetId(1U), FDCAN_DLC_BYTES_2);
 }
 
 static void AppLimitSwitch_OnBusReset(void) {
@@ -214,6 +267,10 @@ static uint8_t AppLimitSwitch_ReadPins(void) {
 static void AppLimitSwitch_ChannelQueue(AppLimitSwitchChannel *ch,
                                         uint8_t state, uint8_t fault,
                                         uint8_t log_change) {
+  if ((ch == NULL) || (ch->enabled == 0u)) {
+    return;
+  }
+
   uint32_t primask = __get_PRIMASK();
   __disable_irq();
   ch->frame[0] = state;
@@ -229,4 +286,28 @@ static void AppLimitSwitch_ChannelQueue(AppLimitSwitchChannel *ch,
     printf("%s limit switch: state=%s fault=%s\r\n", ch->name, state_str,
            fault_str);
   }
+}
+
+static uint8_t AppLimitSwitch_ChannelEnabled(size_t index) {
+  if (index >= (sizeof(limit_switch_channels) / sizeof(limit_switch_channels[0]))) {
+    return 0u;
+  }
+  return limit_switch_channels[index].enabled;
+}
+
+static uint32_t AppLimitSwitch_GetId(size_t index) {
+  const AppConfig *cfg = AppConfig_Get();
+  if (index == 0U) {
+    if (cfg->can_id_sw1 != 0u) {
+      return cfg->can_id_sw1;
+    }
+    return (uint32_t)limit_switch_can_base_id + 1U;
+  }
+  if (index == 1U) {
+    if (cfg->can_id_sw2 != 0u) {
+      return cfg->can_id_sw2;
+    }
+    return (uint32_t)limit_switch_can_base_id + 3U;
+  }
+  return limit_switch_can_base_id + 1U;
 }

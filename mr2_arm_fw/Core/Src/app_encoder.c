@@ -5,12 +5,12 @@
 #include <stdio.h>
 
 #include "app_can.h"
+#include "app_config.h"
 
 #define AS5600_I2C_ADDR (0x36u << 1)
 #define AS5600_ANGLE_START 0x0Eu
 #define AS5600_STEPS 4096.0f
-#define CAN_ID_ENCODER1_STATUS 0x180U
-#define CAN_ID_ENCODER2_STATUS 0x182U
+#define CAN_ID_ENCODER_BASE_DEFAULT 0x180U
 #define ENC_FLAG_INDEX_SEEN 0x01u
 #define ENC_FLAG_ERROR_LATCHED 0x02u
 #define ENC_FLAG_SENSOR_FAULT 0x04u
@@ -30,6 +30,8 @@ static FDCAN_TxHeaderTypeDef encoder_headers[2];
 static uint8_t encoder_status_flags[2] = {0u, 0u};
 static int32_t encoder_position_q24[2] = {0};
 static volatile uint32_t angle_check_pending = 0UL;
+static uint8_t encoder_enabled[2] = {1u, 1u};
+static uint16_t encoder_can_base_id = CAN_ID_ENCODER_BASE_DEFAULT;
 static I2C_FaultContext i2c_fault_contexts[] = {
     {&hi2c1, "I2C1", 0u},
     {&hi2c2, "I2C2", 0u},
@@ -51,6 +53,9 @@ static HAL_StatusTypeDef AS5600_ReadAngleWithFallback(I2C_HandleTypeDef *hi2c,
 static void AppEncoder_RunSample(void);
 static void AppEncoder_SendStatus(uint8_t index);
 static void AppEncoder_OnBusReset(void);
+static void AppEncoder_RefreshHeaders(void);
+static uint8_t AppEncoder_ChannelEnabled(uint8_t index);
+static uint32_t AppEncoder_GetId(uint8_t index);
 
 void AppEncoder_Init(void) {
   angle_check_pending = 0UL;
@@ -62,16 +67,42 @@ void AppEncoder_Init(void) {
   encoder_status_flags[1] = 0u;
   encoder_position_q24[0] = 0;
   encoder_position_q24[1] = 0;
-
-  AppCAN_InitHeader(&encoder_headers[0], CAN_ID_ENCODER1_STATUS,
-                    FDCAN_DLC_BYTES_4);
-  AppCAN_InitHeader(&encoder_headers[1], CAN_ID_ENCODER2_STATUS,
-                    FDCAN_DLC_BYTES_4);
-
+  encoder_enabled[0] = 1u;
+  encoder_enabled[1] = 1u;
+  encoder_can_base_id = CAN_ID_ENCODER_BASE_DEFAULT;
+  AppEncoder_RefreshHeaders();
   AppCAN_RegisterBusResetCallback(AppEncoder_OnBusReset);
 }
 
+void AppEncoder_ApplyConfig(const AppConfig *cfg) {
+  if (cfg == NULL) {
+    return;
+  }
+
+  encoder_enabled[0] = (cfg->enable_encoder1 != 0u) ? 1u : 0u;
+  encoder_enabled[1] = (cfg->enable_encoder2 != 0u) ? 1u : 0u;
+
+  if (cfg->can_base_id <= 0x7FCu) {
+    encoder_can_base_id = cfg->can_base_id;
+  }
+  if (cfg->can_id_encoder1 != 0u) {
+    encoder_headers[0].Identifier = cfg->can_id_encoder1;
+  }
+  if (cfg->can_id_encoder2 != 0u) {
+    encoder_headers[1].Identifier = cfg->can_id_encoder2;
+  }
+
+  if ((encoder_enabled[0] == 0u) && (encoder_enabled[1] == 0u)) {
+    angle_check_pending = 0UL;
+  }
+
+  AppEncoder_RefreshHeaders();
+}
+
 void AppEncoder_RequestMeasurement(void) {
+  if ((encoder_enabled[0] == 0u) && (encoder_enabled[1] == 0u)) {
+    return;
+  }
   if (angle_check_pending < UINT32_MAX) {
     angle_check_pending++;
   }
@@ -89,10 +120,7 @@ bool AppEncoder_Service(void) {
 }
 
 static void AppEncoder_OnBusReset(void) {
-  AppCAN_InitHeader(&encoder_headers[0], CAN_ID_ENCODER1_STATUS,
-                    FDCAN_DLC_BYTES_4);
-  AppCAN_InitHeader(&encoder_headers[1], CAN_ID_ENCODER2_STATUS,
-                    FDCAN_DLC_BYTES_4);
+  AppEncoder_RefreshHeaders();
   AppEncoder_SendStatus(0U);
   AppEncoder_SendStatus(1U);
 }
@@ -258,46 +286,78 @@ static HAL_StatusTypeDef AS5600_ReadAngleWithFallback(I2C_HandleTypeDef *hi2c,
 }
 
 static void AppEncoder_RunSample(void) {
-  probe_as5600(&hi2c1, "I2C1");
-  probe_as5600(&hi2c2, "I2C2");
+  const uint8_t use_enc1 = encoder_enabled[0];
+  const uint8_t use_enc2 = encoder_enabled[1];
+
+  if ((use_enc1 == 0u) && (use_enc2 == 0u)) {
+    return;
+  }
 
   uint16_t angle1 = 0;
   uint16_t angle2 = 0;
-  I2C_FaultContext *i2c1_ctx = I2C_GetContext(&hi2c1);
-  I2C_FaultContext *i2c2_ctx = I2C_GetContext(&hi2c2);
-  HAL_StatusTypeDef s1 =
-      AS5600_ReadAngleWithFallback(&hi2c1, i2c1_ctx, &angle1);
-  HAL_StatusTypeDef s2 =
-      AS5600_ReadAngleWithFallback(&hi2c2, i2c2_ctx, &angle2);
+  HAL_StatusTypeDef s1 = HAL_OK;
+  HAL_StatusTypeDef s2 = HAL_OK;
 
-  if (s1 != HAL_OK) {
-    encoder_status_flags[0] |= (ENC_FLAG_SENSOR_FAULT | ENC_FLAG_ERROR_LATCHED);
-  }
-  if (s2 != HAL_OK) {
-    encoder_status_flags[1] |= (ENC_FLAG_SENSOR_FAULT | ENC_FLAG_ERROR_LATCHED);
-  }
-
-  if (s1 == HAL_OK) {
-    encoder_status_flags[0] |= ENC_FLAG_INDEX_SEEN;
-    encoder_status_flags[0] &= (uint8_t)~ENC_FLAG_SENSOR_FAULT;
-    int32_t centered = ((int32_t)angle1 - 2048) << 12;
-    encoder_position_q24[0] = ClampToS24(centered);
-  }
-  if (s2 == HAL_OK) {
-    encoder_status_flags[1] |= ENC_FLAG_INDEX_SEEN;
-    encoder_status_flags[1] &= (uint8_t)~ENC_FLAG_SENSOR_FAULT;
-    int32_t centered = ((int32_t)angle2 - 2048) << 12;
-    encoder_position_q24[1] = ClampToS24(centered);
-  }
-
-  const float deg1 = (angle1 * 360.0f) / AS5600_STEPS;
-  const float deg2 = (angle2 * 360.0f) / AS5600_STEPS;
-
-  if ((s1 == HAL_OK) && (s2 == HAL_OK)) {
-    printf("A1=%u (%.2fdeg), A2=%u (%.2fdeg)\r\n", angle1, deg1, angle2, deg2);
+  if (use_enc1 != 0u) {
+    probe_as5600(&hi2c1, "I2C1");
+    I2C_FaultContext *i2c1_ctx = I2C_GetContext(&hi2c1);
+    s1 = AS5600_ReadAngleWithFallback(&hi2c1, i2c1_ctx, &angle1);
+    if (s1 != HAL_OK) {
+      encoder_status_flags[0] |=
+          (ENC_FLAG_SENSOR_FAULT | ENC_FLAG_ERROR_LATCHED);
+    } else {
+      encoder_status_flags[0] |= ENC_FLAG_INDEX_SEEN;
+      encoder_status_flags[0] &= (uint8_t)~ENC_FLAG_SENSOR_FAULT;
+      int32_t centered = ((int32_t)angle1 - 2048) << 12;
+      encoder_position_q24[0] = ClampToS24(centered);
+    }
   } else {
-    printf("ERR A1=%u (%.2fdeg), A2=%u (%.2fdeg)\r\n", angle1, deg1, angle2,
-           deg2);
+    encoder_status_flags[0] = 0u;
+    encoder_position_q24[0] = 0;
+  }
+
+  if (use_enc2 != 0u) {
+    probe_as5600(&hi2c2, "I2C2");
+    I2C_FaultContext *i2c2_ctx = I2C_GetContext(&hi2c2);
+    s2 = AS5600_ReadAngleWithFallback(&hi2c2, i2c2_ctx, &angle2);
+    if (s2 != HAL_OK) {
+      encoder_status_flags[1] |=
+          (ENC_FLAG_SENSOR_FAULT | ENC_FLAG_ERROR_LATCHED);
+    } else {
+      encoder_status_flags[1] |= ENC_FLAG_INDEX_SEEN;
+      encoder_status_flags[1] &= (uint8_t)~ENC_FLAG_SENSOR_FAULT;
+      int32_t centered = ((int32_t)angle2 - 2048) << 12;
+      encoder_position_q24[1] = ClampToS24(centered);
+    }
+  } else {
+    encoder_status_flags[1] = 0u;
+    encoder_position_q24[1] = 0;
+  }
+
+  if ((use_enc1 != 0u) && (use_enc2 != 0u)) {
+    const float deg1 = (angle1 * 360.0f) / AS5600_STEPS;
+    const float deg2 = (angle2 * 360.0f) / AS5600_STEPS;
+    if ((s1 == HAL_OK) && (s2 == HAL_OK)) {
+      printf("A1=%u (%.2fdeg), A2=%u (%.2fdeg)\r\n", angle1, deg1, angle2,
+             deg2);
+    } else {
+      printf("ERR A1=%u (%.2fdeg), A2=%u (%.2fdeg)\r\n", angle1, deg1,
+             angle2, deg2);
+    }
+  } else if (use_enc1 != 0u) {
+    const float deg1 = (angle1 * 360.0f) / AS5600_STEPS;
+    if (s1 == HAL_OK) {
+      printf("A1=%u (%.2fdeg)\r\n", angle1, deg1);
+    } else {
+      printf("ERR A1=%u (%.2fdeg)\r\n", angle1, deg1);
+    }
+  } else if (use_enc2 != 0u) {
+    const float deg2 = (angle2 * 360.0f) / AS5600_STEPS;
+    if (s2 == HAL_OK) {
+      printf("A2=%u (%.2fdeg)\r\n", angle2, deg2);
+    } else {
+      printf("ERR A2=%u (%.2fdeg)\r\n", angle2, deg2);
+    }
   }
 
   AppEncoder_SendStatus(0U);
@@ -308,8 +368,41 @@ static void AppEncoder_SendStatus(uint8_t index) {
   if (index >= 2U) {
     return;
   }
+  if (AppEncoder_ChannelEnabled(index) == 0u) {
+    return;
+  }
   uint8_t payload[4] = {0};
   PackS24BE(&payload[0], encoder_position_q24[index]);
   payload[3] = encoder_status_flags[index];
   (void)AppCAN_SendFrame(&encoder_headers[index], payload);
+}
+
+static void AppEncoder_RefreshHeaders(void) {
+  AppCAN_InitHeader(&encoder_headers[0], AppEncoder_GetId(0U),
+                    FDCAN_DLC_BYTES_4);
+  AppCAN_InitHeader(&encoder_headers[1], AppEncoder_GetId(1U),
+                    FDCAN_DLC_BYTES_4);
+}
+
+static uint8_t AppEncoder_ChannelEnabled(uint8_t index) {
+  if (index >= 2U) {
+    return 0u;
+  }
+  return encoder_enabled[index];
+}
+
+static uint32_t AppEncoder_GetId(uint8_t index) {
+  if (index == 0U) {
+    if (AppConfig_Get()->can_id_encoder1 != 0u) {
+      return AppConfig_Get()->can_id_encoder1;
+    }
+    return encoder_can_base_id;
+  }
+  if (index == 1U) {
+    if (AppConfig_Get()->can_id_encoder2 != 0u) {
+      return AppConfig_Get()->can_id_encoder2;
+    }
+    return (uint32_t)encoder_can_base_id + 2U;
+  }
+  return encoder_can_base_id;
 }

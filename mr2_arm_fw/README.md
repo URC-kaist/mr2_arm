@@ -4,6 +4,8 @@ Firmware targeting the STM32H523 MCU that supervises two AS5600 magnetic encoder
 - `Core/Src/app_encoder.c` — encoder sampling, I2C fault handling, and encoder CAN framing.
 - `Core/Src/app_limit_switch.c` — limit switch polling, fault detection, and CAN framing.
 - `Core/Src/app_can.c` — shared CAN helpers and bus-off recovery orchestration.
+- `Core/Src/app_config.c` — holds runtime configuration that controls which
+  channels are active and what CAN base ID to use.
 
 ## High-Level Flow
 - System clock configured to run from the CSI oscillator via PLL1 (SYSCLK ≈ 250 MHz).
@@ -80,6 +82,12 @@ Notes:
 
 - While the contacts remain valid, status frames repeat every 200 ms. When a fault persists, transmissions are throttled to once every 500 ms until the inputs recover.
 - Frames are queued from the timer callback and emitted in the main loop; if the TX FIFO is full the latest payload is retried on the next pass.
+
+### Runtime Configuration (`AppConfig`)
+- The `AppConfig` struct enables or disables each sensor independently (`enable_sw1`, `enable_sw2`, `enable_encoder1`, `enable_encoder2`). Disabled channels neither sample hardware nor emit CAN frames.
+- You can supply explicit 11-bit CAN IDs per channel via `can_id_encoder1`, `can_id_encoder2`, `can_id_sw1`, `can_id_sw2` (set to `0` to fall back to the base+offset scheme). All IDs must be ≤ `0x7FF`.
+- If no per-channel ID is provided, `can_base_id` sets the starting standard ID for all status frames (default `0x180`). Offsets are fixed: encoder1 = `base+0`, SW1 = `base+1`, encoder2 = `base+2`, SW2 = `base+3`. `can_base_id` values above `0x7FC` are rejected to keep offsets within the 11-bit range.
+- Defaults are applied in `main.c` via `AppConfig_InitDefaults()`/`AppConfig_Set()`, then pushed into the modules with `AppEncoder_ApplyConfig()` and `AppLimitSwitch_ApplyConfig()`. Replace or extend this block to load setup data from DIP switches, flash, or a higher-level setup routine.
 
 ## Extending the Firmware
 - To add more diagnostics to CAN, reuse the helper `AppCAN_SendFrame()` and extend the payload tables above.
